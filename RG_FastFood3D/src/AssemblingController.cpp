@@ -109,9 +109,9 @@ void AssemblingController::Update(float dt) {
             {
                 SpawnSpill(spillTex, tipX, tipY, 0.18f);
 
-                cur.Hide();
+                /*cur.Hide();
                 cur.MarkPlaced();
-                m_currentIndex++;
+                m_currentIndex++;*/
 
                 if (m_currentIndex < (int)m_list.size())
                     m_list[m_currentIndex].Show();
