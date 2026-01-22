@@ -8,6 +8,14 @@ Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+	// Depth testing
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+
+	// Face culling
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	glFrontFace(GL_CCW);
 
 	m_shaderProgram = createShader("shaders/rect.vert", "shaders/rect.frag");
 	if (m_shaderProgram == 0) std::cerr << "Failed to create shader program\n";
@@ -52,7 +60,7 @@ void Renderer::SetupQuad() {
 
 void Renderer::Render(Gameplay* gameplay) {
 	glClearColor(0.2f, 0.4f, 0.65f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
 	glUseProgram(m_shaderProgram);
