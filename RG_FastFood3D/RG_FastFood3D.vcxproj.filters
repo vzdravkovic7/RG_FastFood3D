@@ -140,10 +140,18 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="packages.config" />
-    <None Include="shaders\Phong.vert">
+    <None Include="shaders\cube.frag" />
+    <None Include="shaders\cube.vert" />
+    <None Include="shaders\basic.frag">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="shaders\Phong.frag">
+    <None Include="shaders\basic.vert">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\pattie.frag">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\pattie.vert">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
