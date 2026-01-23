@@ -167,8 +167,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="shaders\Phong.frag" />
-    <None Include="shaders\Phong.vert" />
+    <None Include="shaders\basic.frag" />
+    <None Include="shaders\basic.vert" />
+    <None Include="shaders\cube.frag" />
+    <None Include="shaders\cube.vert" />
+    <None Include="shaders\pattie.frag" />
+    <None Include="shaders\pattie.vert" />
     <None Include="shaders\rect.frag" />
     <None Include="shaders\rect.vert" />
   </ItemGroup>
