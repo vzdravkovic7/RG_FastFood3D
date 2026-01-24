@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
+#include "../include/Mesh.h"
+#include <iostream>
 
 class Renderer;
 
@@ -15,6 +17,7 @@ public:
     Gameplay(Renderer* renderer, GLFWwindow* window);
     void Update(float dt);
     void OnRender();
+    bool CheckPattieOvenCollision();
 
     void RenderFinalMessage();
     GLuint m_texPrijatno;
@@ -72,11 +75,23 @@ private:
     GLuint m_pattieVAO = 0;
     int m_pattieVertexCount = 0;
 
-    void CreatePattieMesh();
-
     glm::mat4 m_view;
     glm::mat4 m_projection;
     glm::vec3 m_camPos;
 
+    GLuint m_ovenVAO = 0;
+    int m_ovenVertexCount = 0;
+
     bool m_cursorActive = true;
+
+    std::unique_ptr<Mesh> m_pattieMesh;
+    std::unique_ptr<Mesh> m_ovenMesh;
+    std::unique_ptr<Mesh> m_tableMesh;
+
+    glm::vec3 m_ovenMin;
+    glm::vec3 m_ovenMax;
+
+    glm::vec3 m_pattieSize;
+
+    glm::vec3 m_tablePos = glm::vec3(0, -1.0f, 0);
 };

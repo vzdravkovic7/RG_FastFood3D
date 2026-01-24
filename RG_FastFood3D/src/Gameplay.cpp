@@ -27,7 +27,14 @@ Gameplay::Gameplay(Renderer* renderer, GLFWwindow* window)
     if (m_texCursor)
         Input::InstallCursor(window, "res/cursor_spatula.png");
 
-    CreatePattieMesh();
+    m_pattieMesh = std::unique_ptr<Mesh>(Mesh::CreatePattie());
+    m_ovenMesh = std::unique_ptr<Mesh>(Mesh::CreateOven());
+    m_tableMesh = std::unique_ptr<Mesh>(Mesh::CreateTable());
+
+    m_ovenMin = glm::vec3(-0.5f, 0.0f, -1.7f);
+    m_ovenMax = glm::vec3(0.5f, 0.5f, -0.7f);
+
+    m_pattieSize = glm::vec3(0.75f, 0.125f, 0.75f);
 }
 
 void Gameplay::Update(float dt)
@@ -72,18 +79,10 @@ void Gameplay::Update(float dt)
         if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS) m_pattiePos.x -= m_moveSpeed * dt;
         if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS) m_pattiePos.x += m_moveSpeed * dt;
 
-        // Kretanje po Y (gore/dole)
         if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS) m_pattiePos.y += m_moveSpeed * dt;
         if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) m_pattiePos.y -= m_moveSpeed * dt;
 
-        bool touchingStove =
-            (m_pattieX >= m_stoveCenterX - m_stoveHalfW) &&
-            (m_pattieX <= m_stoveCenterX + m_stoveHalfW) &&
-            (m_pattieY >= m_stoveCenterY - m_stoveHalfH) &&
-            (m_pattieY <= m_stoveCenterY + m_stoveHalfH);
-
-        if (touchingStove)
-        {
+        if (CheckPattieOvenCollision()) {
             m_cookProgress += dt * m_cookRate;
             if (m_cookProgress > 1.0f) m_cookProgress = 1.0f;
         }
@@ -118,54 +117,20 @@ void Gameplay::OnRender()
 
     case STATE_COOKING:
     {
-        m_renderer->DrawRect(m_texStove, m_stoveCenterX, m_stoveCenterY, m_stoveScale);
-
-        m_renderer->Use(); // Shader za pljeskavicu
-
-        // --- Postavi matrice i poziciju kamere ---
-        m_renderer->SetView(m_view);
-        m_renderer->SetProjection(m_projection);
-        m_renderer->SetCameraPosition(m_camPos);
-        // Model matrica pljeskavice
-        m_renderer->SetModel(glm::translate(glm::mat4(1.0f), m_pattiePos));
-        Light light;
-        light.pos = glm::vec3(0.0f, 3.0f, 2.0f);
-        light.kA = glm::vec3(0.4f);
-        light.kD = glm::vec3(0.9f);
-        light.kS = glm::vec3(0.3f);
-
-        m_renderer->SetLight(light);
-
-        Material mat;
-        mat.kA = glm::vec3(1.0f);
-        mat.kD = glm::vec3(1.0f);
-        mat.kS = glm::vec3(0.2f);
-        mat.shine = 16.0f;
-
-        m_renderer->SetMaterial(mat);
-
-
-        // Teksture
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_texPattieRaw);
-        glUniform1i(glGetUniformLocation(m_renderer->GetShaderID(), "uTexRaw"), 0);
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_texPattieCooked);
-        glUniform1i(glGetUniformLocation(m_renderer->GetShaderID(), "uTexCooked"), 1);
-
-        glUniform1f(glGetUniformLocation(m_renderer->GetShaderID(), "uBlend"), m_cookProgress);
-
-        m_renderer->SetPattieTextures(
+        m_renderer->RenderCookingScene(
+            m_ovenMesh.get(),
+            m_pattieMesh.get(),
+            m_pattiePos,
+            m_cookProgress,
+            m_view,
+            m_projection,
+            m_camPos,
+            m_texStove,
             m_texPattieRaw,
-            m_texPattieCooked,
-            m_cookProgress
+            m_texPattieCooked
         );
 
-        // Render
-        m_renderer->RenderMesh(m_pattieVAO, m_pattieVertexCount);
-
-        // --- UI bar (2D sloj) ---
+        // UI bar (2D)
         m_renderer->DrawRect(m_texGray, m_barX, m_barY, m_barScale, m_barThickness);
 
         float fillW = m_barScale * m_cookProgress;
@@ -178,7 +143,13 @@ void Gameplay::OnRender()
 
     case STATE_ASSEMBLING:
     {
-        m_renderer->DrawRect(m_texTable, 0.0f, -0.2f, 2.0f);
+        m_renderer->RenderTable(
+            m_tableMesh.get(),
+            m_view,
+            m_projection,
+            m_camPos,
+            m_texTable
+        );
         // m_assembling.Render(*m_renderer);
     }
     break;
@@ -202,71 +173,7 @@ void Gameplay::RenderFinalMessage()
 {
     if (m_texPrijatno == 0) return;
 
-    m_renderer->DrawRect(m_texPrijatno, 0.0f, 0.65f, 1.5f, 1.5f);
-}
-
-void Gameplay::CreatePattieMesh()
-{
-    std::vector<float> vertices; // pos(3) + normal(3) + uv(2)
-    int segments = 32;
-    float radius = 0.25f;
-    float height = 0.05f;
-
-    for (int i = 0; i < segments; i++)
-    {
-        float theta0 = 2.0f * 3.1415926f * float(i) / float(segments);
-        float theta1 = 2.0f * 3.1415926f * float(i + 1) / float(segments);
-
-        float cos0 = cos(theta0), sin0 = sin(theta0);
-        float cos1 = cos(theta1), sin1 = sin(theta1);
-
-        // --- Donja strana ---
-        vertices.insert(vertices.end(), { 0, -height / 2, 0, 0, -1, 0, 0.5f, 0.5f });
-        vertices.insert(vertices.end(), { radius * cos0, -height / 2, radius * sin0, 0, -1, 0, 0.5f + 0.5f * cos0, 0.5f + 0.5f * sin0 });
-        vertices.insert(vertices.end(), { radius * cos1, -height / 2, radius * sin1, 0, -1, 0, 0.5f + 0.5f * cos1, 0.5f + 0.5f * sin1 });
-
-        // --- Gornja strana ---
-        vertices.insert(vertices.end(), { 0, height / 2, 0, 0, 1, 0, 0.5f, 0.5f });
-        vertices.insert(vertices.end(), { radius * cos0, height / 2, radius * sin0, 0, 1, 0, 0.5f + 0.5f * cos0, 0.5f + 0.5f * sin0 });
-        vertices.insert(vertices.end(), { radius * cos1, height / 2, radius * sin1, 0, 1, 0, 0.5f + 0.5f * cos1, 0.5f + 0.5f * sin1 });
-
-        // --- Boène strane ---
-        glm::vec3 n0 = glm::normalize(glm::vec3(cos0, 0, sin0));
-        glm::vec3 n1 = glm::normalize(glm::vec3(cos1, 0, sin1));
-
-        vertices.insert(vertices.end(), { radius * cos0, -height / 2, radius * sin0, n0.x, n0.y, n0.z, float(i) / segments, 0 });
-        vertices.insert(vertices.end(), { radius * cos0, height / 2, radius * sin0, n0.x, n0.y, n0.z, float(i) / segments, 1 });
-        vertices.insert(vertices.end(), { radius * cos1, height / 2, radius * sin1, n1.x, n1.y, n1.z, float(i + 1) / segments, 1 });
-
-        vertices.insert(vertices.end(), { radius * cos0, -height / 2, radius * sin0, n0.x, n0.y, n0.z, float(i) / segments, 0 });
-        vertices.insert(vertices.end(), { radius * cos1, height / 2, radius * sin1, n1.x, n1.y, n1.z, float(i + 1) / segments, 1 });
-        vertices.insert(vertices.end(), { radius * cos1, -height / 2, radius * sin1, n1.x, n1.y, n1.z, float(i + 1) / segments, 0 });
-    }
-
-    m_pattieVertexCount = (int)vertices.size() / 8;
-
-    // VAO + VBO
-    GLuint VBO;
-    glGenVertexArrays(1, &m_pattieVAO);
-    glGenBuffers(1, &VBO);
-
-    glBindVertexArray(m_pattieVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-    // positions
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-
-    // normals
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // texcoords
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-
-    glBindVertexArray(0);
+    m_renderer->DrawRect(m_texPrijatno, 0.0f, 0.65f, 0.3f, 0.3f);
 }
 
 void Gameplay::SetCamera(const glm::vec3& camPos, const glm::mat4& view, const glm::mat4& proj) {
@@ -297,3 +204,16 @@ void Gameplay::UpdateCursor()
         }
     }
 }
+
+bool Gameplay::CheckPattieOvenCollision() {
+    glm::vec3 pattieMin = m_pattiePos - m_pattieSize;
+    glm::vec3 pattieMax = m_pattiePos + m_pattieSize;
+
+    // Collision
+    bool overlapX = pattieMax.x >= m_ovenMin.x && pattieMin.x <= m_ovenMax.x;
+    bool overlapY = pattieMax.y >= m_ovenMin.y && pattieMin.y <= m_ovenMax.y;
+    bool overlapZ = pattieMax.z >= m_ovenMin.z && pattieMin.z <= m_ovenMax.z;
+
+    return overlapX && overlapY && overlapZ;
+}
+

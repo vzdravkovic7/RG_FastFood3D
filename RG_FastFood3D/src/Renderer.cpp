@@ -65,7 +65,6 @@ bool Renderer::LoadShaders(const std::string& vsPath, const std::string& fsPath)
         return false;
     }
 
-    // Uniform locations
     m_locModel = glGetUniformLocation(m_shaderID, "uM");
     m_locView = glGetUniformLocation(m_shaderID, "uV");
     m_locProjection = glGetUniformLocation(m_shaderID, "uP");
@@ -85,6 +84,7 @@ bool Renderer::LoadShaders(const std::string& vsPath, const std::string& fsPath)
     m_locTexRaw = glGetUniformLocation(m_shaderID, "uTexRaw");
     m_locTexCooked = glGetUniformLocation(m_shaderID, "uTexCooked");
     m_locBlend = glGetUniformLocation(m_shaderID, "uBlend");
+    m_locBaseColor = glGetUniformLocation(m_shaderID, "uBaseColor");
 
     return true;
 }
@@ -242,17 +242,17 @@ void Renderer::SetAlpha(float a)
 
 void Renderer::SetPattieTextures(GLuint rawTex, GLuint cookedTex, float blend)
 {
-    // tekstura 0 -> raw
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rawTex);
     glUniform1i(m_locTexRaw, 0);
 
-    // tekstura 1 -> cooked
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, cookedTex);
     glUniform1i(m_locTexCooked, 1);
 
     glUniform1f(m_locBlend, blend);
+
+    glUniform3f(m_locBaseColor, 0.45f, 0.22f, 0.15f);
 }
 
 void Renderer::EnableDepthTest(bool enable)
@@ -275,4 +275,103 @@ void Renderer::EnableFaceCulling(bool enable)
     {
         glDisable(GL_CULL_FACE);
     }
+}
+
+void Renderer::RenderCookingScene(
+    Mesh* oven,
+    Mesh* pattie,
+    const glm::vec3& pattiePos,
+    float cookProgress,
+    const glm::mat4& view,
+    const glm::mat4& projection,
+    const glm::vec3& camPos,
+    GLuint texStove,
+    GLuint texPattieRaw,
+    GLuint texPattieCooked
+)
+{
+    Use();
+
+    SetView(view);
+    SetProjection(projection);
+    SetCameraPosition(camPos);
+
+    Light light;
+    light.pos = glm::vec3(0.0f, 3.0f, 2.0f);
+    light.kA = glm::vec3(0.4f);
+    light.kD = glm::vec3(0.9f);
+    light.kS = glm::vec3(0.3f);
+    SetLight(light);
+
+    Material mat;
+    mat.kA = glm::vec3(1.0f);
+    mat.kD = glm::vec3(1.0f);
+    mat.kS = glm::vec3(0.2f);
+    mat.shine = 16.0f;
+    SetMaterial(mat);
+
+    glm::mat4 Moven = glm::mat4(1.0f);
+    Moven = glm::translate(Moven, glm::vec3(0.0f, 0.0f, -1.2f));
+    SetModel(Moven);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texStove);
+    glUniform1i(glGetUniformLocation(m_shaderID, "uTexRaw"), 0);
+    glUniform1i(glGetUniformLocation(m_shaderID, "uTexCooked"), 0);
+    glUniform1f(glGetUniformLocation(m_shaderID, "uBlend"), 0.0f);
+
+    if (oven) oven->Draw();
+
+    glm::mat4 M = glm::mat4(1.0f);
+    M = glm::translate(M, pattiePos);
+    M = glm::rotate(M, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+    M = glm::scale(M, glm::vec3(1.5f, 1.5f, 0.25f));
+    SetModel(M);
+
+    SetPattieTextures(texPattieRaw, texPattieCooked, cookProgress);
+
+    if (pattie) pattie->Draw();
+}
+
+void Renderer::RenderTable(
+    Mesh* tableMesh,
+    const glm::mat4& view,
+    const glm::mat4& projection,
+    const glm::vec3& camPos,
+    GLuint texTable
+)
+{
+    Use();
+
+    SetView(view);
+    SetProjection(projection);
+    SetCameraPosition(camPos);
+
+    Light light;
+    light.pos = glm::vec3(0.0f, 3.0f, 2.0f);
+    light.kA = glm::vec3(0.4f);
+    light.kD = glm::vec3(0.9f);
+    light.kS = glm::vec3(0.3f);
+    SetLight(light);
+
+    Material mat;
+    mat.kA = glm::vec3(1.0f);
+    mat.kD = glm::vec3(1.0f);
+    mat.kS = glm::vec3(0.2f);
+    mat.shine = 16.0f;
+    SetMaterial(mat);
+
+    glm::mat4 M = glm::mat4(1.0f);
+    M = glm::translate(M, glm::vec3(0.0f, -0.2f, 0.0f));
+    M = glm::scale(M, glm::vec3(2.0f, 2.0f, 2.0f));
+    SetModel(M);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texTable);
+    glUniform1i(glGetUniformLocation(m_shaderID, "uTexRaw"), 0);
+    glUniform1i(glGetUniformLocation(m_shaderID, "uTexCooked"), 0);
+    glUniform1f(glGetUniformLocation(m_shaderID, "uBlend"), 0.0f);
+
+    if (tableMesh)
+        tableMesh->Draw();
 }

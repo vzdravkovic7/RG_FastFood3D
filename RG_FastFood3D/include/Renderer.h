@@ -2,6 +2,7 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 #include <string>
+#include "../include/Mesh.h"
 
 struct Light {
     glm::vec3 pos;
@@ -35,7 +36,6 @@ public:
     void SetMaterial(const Material& m);
     void SetCameraPosition(const glm::vec3& pos);
 
-    // Crtanje
     void RenderMesh(GLuint vao, int vertexCount);
 
     bool LoadUIShaders(const std::string& vs, const std::string& fs);
@@ -54,6 +54,27 @@ public:
 
     void EnableDepthTest(bool enable);
     void EnableFaceCulling(bool enable);
+
+    void RenderCookingScene(
+        Mesh* oven,
+        Mesh* pattie,
+        const glm::vec3& pattiePos,
+        float cookProgress,
+        const glm::mat4& view,
+        const glm::mat4& projection,
+        const glm::vec3& camPos,
+        GLuint texStove,
+        GLuint texPattieRaw,
+        GLuint texPattieCooked
+    );
+
+    void RenderTable(
+        Mesh* tableMesh,
+        const glm::mat4& view,
+        const glm::mat4& projection,
+        const glm::vec3& camPos,
+        GLuint texTable
+    );
 
 private:
     int m_width;
@@ -91,4 +112,5 @@ private:
     GLint m_locTexRaw;
     GLint m_locTexCooked;
     GLint m_locBlend;
+    GLint m_locBaseColor;
 };

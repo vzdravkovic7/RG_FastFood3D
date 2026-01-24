@@ -24,18 +24,24 @@ struct Material {
 };
 uniform Material uMaterial;
 
-// Teksture za pljeskavicu
+// Textures
 uniform sampler2D uTexRaw;
 uniform sampler2D uTexCooked;
 uniform float uBlend; // 0 -> raw, 1 -> cooked
+uniform vec3 uBaseColor;
 
 void main() {
-    // --- Blend teksture ---
     vec4 colRaw = texture(uTexRaw, vTex);
     vec4 colCooked = texture(uTexCooked, vTex);
     vec4 texColor = mix(colRaw, colCooked, clamp(uBlend, 0.0, 1.0));
 
-    // --- Phong osvetljenje ---
+    vec3 rawColor = colRaw.rgb;
+    vec3 cookedColor = colCooked.rgb;
+
+    vec3 mixedTex = mix(rawColor, cookedColor, clamp(uBlend, 0.0, 1.0));
+    mixedTex = max(mixedTex, uBaseColor);
+
+    // Phong lighting
     vec3 N = normalize(vNormal);
     vec3 L = normalize(uLight.pos - vFragPos);
     vec3 V = normalize(uViewPos - vFragPos);
@@ -48,7 +54,7 @@ void main() {
     vec3 diffuse  = uLight.kD * (diff * uMaterial.kD);
     vec3 specular = uLight.kS * (spec * uMaterial.kS);
 
-    vec3 finalColor = (ambient + diffuse + specular) * texColor.rgb;
+    vec3 finalColor = (ambient + diffuse + specular) * mixedTex;
 
-    FragColor = vec4(finalColor, texColor.a);
+    FragColor = vec4(finalColor, 1.0);
 }
