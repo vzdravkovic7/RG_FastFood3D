@@ -48,13 +48,12 @@ int Application::Run() {
 
     Input::Init(m_window);
 
-    // Renderer
     m_renderer = std::make_unique<Renderer>(m_width, m_height);
     m_renderer->LoadShaders("shaders/basic.vert", "shaders/basic.frag");
     m_renderer->LoadUIShaders("shaders/rect.vert", "shaders/rect.frag");
     m_renderer->InitUIQuad();
 
-    // Projection matrica (perspektiva)
+    // Projection matrix
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f),
         (float)m_width / (float)m_height,
@@ -65,10 +64,9 @@ int Application::Run() {
     m_renderer->Use();
     m_renderer->SetProjection(projection);
 
-    // Gameplay
     m_gameplay = std::make_unique<Gameplay>(m_renderer.get(), m_window);
 
-    // Kamera
+    // Camera
     glm::vec3 camPos = glm::vec3(0, 5, 10);
     float yaw = -90.0f;
     float pitch = -20.0f;
@@ -100,16 +98,15 @@ int Application::Run() {
         if (glfwGetKey(m_window, GLFW_KEY_4) == GLFW_PRESS)
             m_renderer->EnableFaceCulling(false);
 
-        // --- Kamera ---
         glm::mat4 view;
-        if (m_gameplay->GetState() == STATE_COOKING) {
-            // Pomicanje kamere strelicama
+        if (m_gameplay->GetState() == STATE_COOKING || m_gameplay->GetState() == STATE_ASSEMBLING) {
+            // Camera movement
             if (glfwGetKey(m_window, GLFW_KEY_UP) == GLFW_PRESS)    camPos += camSpeed * dtf * glm::vec3(0, 0, -1);
             if (glfwGetKey(m_window, GLFW_KEY_DOWN) == GLFW_PRESS)  camPos += camSpeed * dtf * glm::vec3(0, 0, 1);
             if (glfwGetKey(m_window, GLFW_KEY_LEFT) == GLFW_PRESS)  camPos += camSpeed * dtf * glm::vec3(-1, 0, 0);
             if (glfwGetKey(m_window, GLFW_KEY_RIGHT) == GLFW_PRESS) camPos += camSpeed * dtf * glm::vec3(1, 0, 0);
 
-            // Pomicanje pogleda mišem
+            // Camera view
             double mouseX, mouseY;
             glfwGetCursorPos(m_window, &mouseX, &mouseY);
             if (firstMouse) { lastMouseX = mouseX; lastMouseY = mouseY; firstMouse = false; }
@@ -132,7 +129,7 @@ int Application::Run() {
             view = glm::lookAt(camPos, camPos + front, glm::vec3(0, 1, 0));
         }
         else {
-            // Fiksna kamera za start menu / Prijatno!
+            // Fixed camera for start menu / Prijatno!
             camPos = glm::vec3(0, 5, 10);
             view = glm::lookAt(camPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
         }
@@ -142,14 +139,11 @@ int Application::Run() {
         m_renderer->SetCameraPosition(camPos);
         m_gameplay->SetCamera(camPos, view, projection);
 
-        // --- Game logic ---
         m_gameplay->Update(dtf);
 
-        // --- Clear screen ---
         glClearColor(0.15f, 0.15f, 0.18f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // --- Render world ---
         m_gameplay->OnRender();
 
         glfwSwapBuffers(m_window);
