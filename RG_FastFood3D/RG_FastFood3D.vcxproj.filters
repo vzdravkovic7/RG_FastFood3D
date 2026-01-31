@@ -60,6 +60,12 @@
     <ClInclude Include="include\shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\IngredientMesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ModelLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\_solid_gray.png">
@@ -137,8 +143,6 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="packages.config" />
-    <None Include="shaders\cube.frag" />
-    <None Include="shaders\cube.vert" />
     <None Include="shaders\basic.frag">
       <Filter>Source Files</Filter>
     </None>
@@ -149,6 +153,12 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="shaders\pattie.vert">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\textured.vert">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\textured.frag">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
@@ -187,6 +197,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Mesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ModelLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

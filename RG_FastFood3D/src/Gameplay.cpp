@@ -21,15 +21,19 @@ Gameplay::Gameplay(Renderer* renderer, GLFWwindow* window)
     m_texGreen = Texture::FromFile("res/_solid_green.png");
     m_texGray = Texture::FromFile("res/_solid_gray.png");
     m_texPrijatno = Texture::FromFile("res/prijatno.png");
+    m_texPlate = Texture::FromFile("res/plate.png");
 
     m_assembling.LoadTextures();
+    m_pattieMesh = std::unique_ptr<Mesh>(Mesh::CreatePattie());
+    m_assembling.LoadModels(m_pattieMesh.get());
+    m_assembling.SetRenderer(m_renderer);
 
     if (m_texCursor)
         Input::InstallCursor(window, "res/cursor_spatula.png");
 
-    m_pattieMesh = std::unique_ptr<Mesh>(Mesh::CreatePattie());
     m_ovenMesh = std::unique_ptr<Mesh>(Mesh::CreateOven());
     m_tableMesh = std::unique_ptr<Mesh>(Mesh::CreateTable());
+    m_plateMesh = std::unique_ptr<Mesh>(Mesh::CreatePlate());
 
     m_ovenMin = glm::vec3(-0.5f, 0.0f, -1.7f);
     m_ovenMax = glm::vec3(0.5f, 0.5f, -0.7f);
@@ -143,20 +147,22 @@ void Gameplay::OnRender()
 
     case STATE_ASSEMBLING:
     {
-        m_renderer->RenderTable(
+        m_renderer->RenderAssemblingScene(
             m_tableMesh.get(),
+            m_plateMesh.get(),
             m_view,
             m_projection,
             m_camPos,
+            m_texPlate,
             m_texTable
         );
-        // m_assembling.Render(*m_renderer);
+        m_assembling.Render(m_view, m_projection, m_camPos, false);
     }
     break;
 
     case STATE_FINISHED:
     {
-        // m_assembling.Render(*m_renderer);
+        m_assembling.Render(m_view, m_projection, m_camPos, true);
         RenderFinalMessage();
     }
     break;

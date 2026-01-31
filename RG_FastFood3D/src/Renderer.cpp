@@ -7,6 +7,28 @@
 Renderer::Renderer(int w, int h)
     : m_shaderID(0), m_width(w), m_height(h)
 {
+    LoadTexturedShaders("shaders/textured.vert", "shaders/textured.frag");
+
+    m_light.pos = glm::vec3(0.0f, 3.0f, 2.0f);
+    m_light.kA = glm::vec3(0.4f);
+    m_light.kD = glm::vec3(0.9f);
+    m_light.kS = glm::vec3(0.3f);
+    m_light.enabled = true;
+}
+
+void Renderer::ToggleLight()
+{
+    m_light.enabled = !m_light.enabled;
+}
+
+void Renderer::SetLightEnabled(bool enabled)
+{
+    m_light.enabled = enabled;
+}
+
+bool Renderer::IsLightEnabled() const
+{
+    return m_light.enabled;
 }
 
 Renderer::~Renderer() {
@@ -89,6 +111,53 @@ bool Renderer::LoadShaders(const std::string& vsPath, const std::string& fsPath)
     return true;
 }
 
+bool Renderer::LoadTexturedShaders(const std::string& vs, const std::string& fs)
+{
+    GLuint v = LoadShader(GL_VERTEX_SHADER, vs);
+    GLuint f = LoadShader(GL_FRAGMENT_SHADER, fs);
+
+    m_texturedShaderID = glCreateProgram();
+    glAttachShader(m_texturedShaderID, v);
+    glAttachShader(m_texturedShaderID, f);
+    glLinkProgram(m_texturedShaderID);
+
+    glDeleteShader(v);
+    glDeleteShader(f);
+
+    GLint success;
+    glGetProgramiv(m_texturedShaderID, GL_LINK_STATUS, &success);
+    if (!success) {
+        char info[512];
+        glGetProgramInfoLog(m_texturedShaderID, 512, nullptr, info);
+        std::cout << "Textured shader link error:\n" << info << std::endl;
+        return false;
+    }
+
+    m_locModel = glGetUniformLocation(m_texturedShaderID, "uM");
+    m_locView = glGetUniformLocation(m_texturedShaderID, "uV");
+    m_locProjection = glGetUniformLocation(m_texturedShaderID, "uP");
+
+    m_locLightPos = glGetUniformLocation(m_texturedShaderID, "uLight.pos");
+    m_locLightKA = glGetUniformLocation(m_texturedShaderID, "uLight.kA");
+    m_locLightKD = glGetUniformLocation(m_texturedShaderID, "uLight.kD");
+    m_locLightKS = glGetUniformLocation(m_texturedShaderID, "uLight.kS");
+
+    m_locMatKA = glGetUniformLocation(m_texturedShaderID, "uMaterial.kA");
+    m_locMatKD = glGetUniformLocation(m_texturedShaderID, "uMaterial.kD");
+    m_locMatKS = glGetUniformLocation(m_texturedShaderID, "uMaterial.kS");
+    m_locMatShine = glGetUniformLocation(m_texturedShaderID, "uMaterial.shine");
+
+    m_locTexSingle = glGetUniformLocation(m_texturedShaderID, "uTexture");
+
+    return true;
+}
+
+void Renderer::UseTexturedShader()
+{
+    glUseProgram(m_texturedShaderID);
+    glUniform1i(m_locTexSingle, 0);
+}
+
 void Renderer::Use() {
     glUseProgram(m_shaderID);
 }
@@ -105,11 +174,23 @@ void Renderer::SetProjection(const glm::mat4& p) {
     glUniformMatrix4fv(m_locProjection, 1, GL_FALSE, glm::value_ptr(p));
 }
 
-void Renderer::SetLight(const Light& l) {
+void Renderer::SetLight(const Light& l)
+{
     glUniform3fv(m_locLightPos, 1, glm::value_ptr(l.pos));
-    glUniform3fv(m_locLightKA, 1, glm::value_ptr(l.kA));
-    glUniform3fv(m_locLightKD, 1, glm::value_ptr(l.kD));
-    glUniform3fv(m_locLightKS, 1, glm::value_ptr(l.kS));
+
+    if (l.enabled)
+    {
+        glUniform3fv(m_locLightKA, 1, glm::value_ptr(l.kA));
+        glUniform3fv(m_locLightKD, 1, glm::value_ptr(l.kD));
+        glUniform3fv(m_locLightKS, 1, glm::value_ptr(l.kS));
+    }
+    else
+    {
+        glm::vec3 zero(0.0f);
+        glUniform3fv(m_locLightKA, 1, glm::value_ptr(zero));
+        glUniform3fv(m_locLightKD, 1, glm::value_ptr(zero));
+        glUniform3fv(m_locLightKS, 1, glm::value_ptr(zero));
+    }
 }
 
 void Renderer::SetMaterial(const Material& m) {
@@ -296,12 +377,7 @@ void Renderer::RenderCookingScene(
     SetProjection(projection);
     SetCameraPosition(camPos);
 
-    Light light;
-    light.pos = glm::vec3(0.0f, 3.0f, 2.0f);
-    light.kA = glm::vec3(0.4f);
-    light.kD = glm::vec3(0.9f);
-    light.kS = glm::vec3(0.3f);
-    SetLight(light);
+    SetLight(m_light);
 
     Material mat;
     mat.kA = glm::vec3(1.0f);
@@ -333,45 +409,129 @@ void Renderer::RenderCookingScene(
     if (pattie) pattie->Draw();
 }
 
-void Renderer::RenderTable(
-    Mesh* tableMesh,
+void Renderer::RenderAssemblingScene(
+    Mesh* table,
+    Mesh* plate,
     const glm::mat4& view,
     const glm::mat4& projection,
     const glm::vec3& camPos,
+    GLuint texPlate,
     GLuint texTable
 )
 {
-    Use();
+    float assemblingZOffset = 4.0f;
+    UseTexturedShader();
 
     SetView(view);
     SetProjection(projection);
     SetCameraPosition(camPos);
 
-    Light light;
-    light.pos = glm::vec3(0.0f, 3.0f, 2.0f);
-    light.kA = glm::vec3(0.4f);
-    light.kD = glm::vec3(0.9f);
-    light.kS = glm::vec3(0.3f);
-    SetLight(light);
+    SetLight(m_light);
 
     Material mat;
     mat.kA = glm::vec3(1.0f);
     mat.kD = glm::vec3(1.0f);
-    mat.kS = glm::vec3(0.2f);
-    mat.shine = 16.0f;
+    mat.kS = glm::vec3(0.3f);
+    mat.shine = 32.0f;
     SetMaterial(mat);
 
-    glm::mat4 M = glm::mat4(1.0f);
-    M = glm::translate(M, glm::vec3(0.0f, -0.2f, 0.0f));
-    M = glm::scale(M, glm::vec3(2.0f, 2.0f, 2.0f));
-    SetModel(M);
+    glm::mat4 Mtable(1.0f);
+    Mtable = glm::translate(
+        Mtable,
+        glm::vec3(0.0f, -0.5f, assemblingZOffset)
+    );
+    SetModel(Mtable);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texTable);
-    glUniform1i(glGetUniformLocation(m_shaderID, "uTexRaw"), 0);
-    glUniform1i(glGetUniformLocation(m_shaderID, "uTexCooked"), 0);
-    glUniform1f(glGetUniformLocation(m_shaderID, "uBlend"), 0.0f);
+    glUniform1i(m_locTexSingle, 0);
 
-    if (tableMesh)
-        tableMesh->Draw();
+    table->Draw();
+
+    glm::mat4 Mplate(1.0f);
+    Mplate = glm::translate(
+        Mplate,
+        glm::vec3(0.0f, -0.25f, assemblingZOffset)
+    );
+    SetModel(Mplate);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texPlate);
+    glUniform1i(m_locTexSingle, 0);
+
+    plate->Draw();
+}
+
+void Renderer::RenderSpill(
+    Mesh* quad,
+    const glm::mat4& view,
+    const glm::mat4& projection,
+    const glm::vec3& camPos,
+    const Spill& s)
+{
+    UseTexturedShader();
+
+    SetView(view);
+    SetProjection(projection);
+    SetCameraPosition(camPos);
+
+    glm::mat4 M(1.0f);
+    M = glm::translate(M, s.pos);
+    M = glm::scale(M, glm::vec3(s.scale));
+    SetModel(M);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, s.tex);
+    glUniform1i(m_locTexSingle, 0);
+
+    quad->Draw();
+}
+
+void Renderer::RenderIngredient(
+    Mesh* mesh,
+    const glm::mat4& view,
+    const glm::mat4& projection,
+    const glm::vec3& camPos,
+    GLuint texture,
+    const glm::vec3& pos,
+    const glm::vec3& scale,
+    const glm::vec3& rot
+)
+{
+    float assemblingZOffset = 4.0f;
+    UseTexturedShader();
+
+    SetView(view);
+    SetProjection(projection);
+    SetCameraPosition(camPos);
+
+    Material mat;
+    mat.kA = mesh->diffuseColor * 0.3f;
+    mat.kD = mesh->diffuseColor;
+    mat.kS = glm::vec3(0.3f);
+    mat.shine = 32.0f;
+    SetMaterial(mat);
+
+    SetLight(m_light);
+
+    glm::mat4 M(1.0f);
+    glm::vec3 finalPos = pos;
+    finalPos.z += assemblingZOffset;
+    M = glm::translate(M, finalPos);
+
+    M = glm::rotate(M, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+    M = glm::rotate(M, rot.x, glm::vec3(1, 0, 0));
+    M = glm::rotate(M, rot.y, glm::vec3(0, 1, 0));
+    M = glm::rotate(M, rot.z, glm::vec3(0, 0, 1));
+    M = glm::scale(M, scale);
+
+    SetModel(M);
+
+    GLuint texToBind = (texture != 0) ? texture : Texture::White();
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texToBind);
+    glUniform1i(m_locTexSingle, 0);
+
+    mesh->Draw();
 }

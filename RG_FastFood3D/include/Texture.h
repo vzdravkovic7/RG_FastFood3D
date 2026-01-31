@@ -6,4 +6,5 @@
 class Texture {
 public:
 	static GLuint FromFile(const std::string& path);
+	static GLuint White();
 };
