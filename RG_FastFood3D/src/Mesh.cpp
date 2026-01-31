@@ -1,5 +1,10 @@
 #include "../include/Mesh.h"
+#include "../include/ModelLoader.h"
 #include <cmath>
+
+Mesh::Mesh()
+{
+}
 
 Mesh::Mesh(const std::vector<Vertex>& vertices)
 {
@@ -220,4 +225,198 @@ Mesh* Mesh::CreateTable()
     AddLeg(offsetX, offsetZ);
 
     return new Mesh(vertices);
+}
+
+Mesh* Mesh::CreatePlate()
+{
+    std::vector<Vertex> vertices;
+
+    float innerRadius = 0.12f;   // rupa (dno tanjira)
+    float outerRadius = 0.25f;   // spoljašnji polupreènik
+    float depth = 0.03f;         // koliko je tanjir “udubljen”
+    int segments = 48;
+
+    for (int i = 0; i < segments; i++)
+    {
+        float t0 = 2.0f * 3.1415926f * float(i) / segments;
+        float t1 = 2.0f * 3.1415926f * float(i + 1) / segments;
+
+        float c0 = cos(t0), s0 = sin(t0);
+        float c1 = cos(t1), s1 = sin(t1);
+
+        // --- GORNJI PRSTEN (zakrivljen)
+        glm::vec3 A(outerRadius * c0, depth, outerRadius * s0);
+        glm::vec3 B(outerRadius * c1, depth, outerRadius * s1);
+        glm::vec3 C(innerRadius * c1, 0.0f, innerRadius * s1);
+        glm::vec3 D(innerRadius * c0, 0.0f, innerRadius * s0);
+
+        glm::vec3 nTop = glm::normalize(glm::cross(B - A, D - A));
+
+        // Trougao 1
+        vertices.push_back({ A, nTop, {1.0f, 0.0f} });
+        vertices.push_back({ B, nTop, {1.0f, 1.0f} });
+        vertices.push_back({ C, nTop, {0.0f, 1.0f} });
+
+        // Trougao 2
+        vertices.push_back({ A, nTop, {1.0f, 0.0f} });
+        vertices.push_back({ C, nTop, {0.0f, 1.0f} });
+        vertices.push_back({ D, nTop, {0.0f, 0.0f} });
+
+        // --- DONJA POVRŠINA (ravna)
+        glm::vec3 Ab(outerRadius * c0, 0.0f, outerRadius * s0);
+        glm::vec3 Bb(outerRadius * c1, 0.0f, outerRadius * s1);
+        glm::vec3 Cb(innerRadius * c1, 0.0f, innerRadius * s1);
+        glm::vec3 Db(innerRadius * c0, 0.0f, innerRadius * s0);
+
+        glm::vec3 nBottom = glm::vec3(0, -1, 0);
+
+        vertices.push_back({ Ab, nBottom, {1, 0} });
+        vertices.push_back({ Cb, nBottom, {0, 1} });
+        vertices.push_back({ Bb, nBottom, {1, 1} });
+
+        vertices.push_back({ Ab, nBottom, {1, 0} });
+        vertices.push_back({ Db, nBottom, {0, 0} });
+        vertices.push_back({ Cb, nBottom, {0, 1} });
+    }
+
+    return new Mesh(vertices);
+}
+
+Mesh* Mesh::CreateSpillQuad()
+{
+    std::vector<Vertex> vertices = {
+        // pozicija                // normal                // uv
+        {{-0.5f, 0.0f, -0.5f},     {0.0f, 1.0f, 0.0f},      {0.0f, 0.0f}},
+        {{ 0.5f, 0.0f, -0.5f},     {0.0f, 1.0f, 0.0f},      {1.0f, 0.0f}},
+        {{ 0.5f, 0.0f, 0.5f},      {0.0f, 1.0f, 0.0f},      {1.0f, 1.0f}},
+        {{-0.5f, 0.0f, 0.5f},      {0.0f, 1.0f, 0.0f},      {0.0f, 1.0f}},
+    };
+
+    std::vector<unsigned> indices = {
+        0, 1, 2,
+        2, 3, 0
+    };
+
+    return new Mesh(vertices);
+}
+
+void Mesh::Upload(const MeshData& data)
+{
+    vertexCount = data.positions.size();
+
+    std::vector<float> buffer;
+    buffer.reserve(vertexCount * 8);
+
+    for (size_t i = 0; i < vertexCount; i++)
+    {
+        buffer.push_back(data.positions[i].x);
+        buffer.push_back(data.positions[i].y);
+        buffer.push_back(data.positions[i].z);
+
+        buffer.push_back(data.normals[i].x);
+        buffer.push_back(data.normals[i].y);
+        buffer.push_back(data.normals[i].z);
+
+        buffer.push_back(data.uvs[i].x);
+        buffer.push_back(data.uvs[i].y);
+    }
+
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
+
+    GLsizei stride = 8 * sizeof(float);
+
+    // pos = 0
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+
+    // normal = 1 (3 floats posle pozicije)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+
+    // uv = 2 (2 floats posle poz+norm)
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+
+    glBindVertexArray(0);
+}
+
+Mesh* Mesh::CreateSauceBottle()
+{
+    std::vector<Vertex> vertices;
+
+    const int segments = 32;
+
+    float radius = 0.12f;
+    float height = 0.5f;
+
+    float coneHeight = 0.18f;
+    float coneRadius = 0.06f;
+
+    // CYLINDER (telo)
+    for (int i = 0; i < segments; i++)
+    {
+        float t0 = 2.0f * 3.1415926f * i / segments;
+        float t1 = 2.0f * 3.1415926f * (i + 1) / segments;
+
+        float c0 = cos(t0), s0 = sin(t0);
+        float c1 = cos(t1), s1 = sin(t1);
+
+        glm::vec3 n0 = glm::normalize(glm::vec3(c0, 0, s0));
+        glm::vec3 n1 = glm::normalize(glm::vec3(c1, 0, s1));
+
+        // boèna strana
+        vertices.push_back({ {radius * c0, 0.0f, radius * s0}, n0, {float(i) / segments, 0} });
+        vertices.push_back({ {radius * c0, height, radius * s0}, n0, {float(i) / segments, 1} });
+        vertices.push_back({ {radius * c1, height, radius * s1}, n1, {float(i + 1) / segments, 1} });
+
+        vertices.push_back({ {radius * c0, 0.0f, radius * s0}, n0, {float(i) / segments, 0} });
+        vertices.push_back({ {radius * c1, height, radius * s1}, n1, {float(i + 1) / segments, 1} });
+        vertices.push_back({ {radius * c1, 0.0f, radius * s1}, n1, {float(i + 1) / segments, 0} });
+    }
+
+    // TOP CAP (zatvaranje gore)
+    for (int i = 0; i < segments; i++)
+    {
+        float t0 = 2.0f * 3.1415926f * i / segments;
+        float t1 = 2.0f * 3.1415926f * (i + 1) / segments;
+
+        vertices.push_back({ {0, height, 0}, {0,1,0}, {0.5f,0.5f} });
+        vertices.push_back({ {radius * cos(t0), height, radius * sin(t0)}, {0,1,0}, {0,0} });
+        vertices.push_back({ {radius * cos(t1), height, radius * sin(t1)}, {0,1,0}, {1,0} });
+    }
+
+    // CONE (donja kupa)
+    glm::vec3 tip(0.0f, -coneHeight, 0.0f);
+
+    for (int i = 0; i < segments; i++)
+    {
+        float t0 = 2.0f * 3.1415926f * i / segments;
+        float t1 = 2.0f * 3.1415926f * (i + 1) / segments;
+
+        glm::vec3 p0(coneRadius * cos(t0), 0.0f, coneRadius * sin(t0));
+        glm::vec3 p1(coneRadius * cos(t1), 0.0f, coneRadius * sin(t1));
+
+        glm::vec3 n = glm::normalize(glm::cross(p1 - tip, p0 - tip));
+
+        vertices.push_back({ tip, n, {0.5f, 1.0f} });
+        vertices.push_back({ p0, n, {0.0f, 0.0f} });
+        vertices.push_back({ p1, n, {1.0f, 0.0f} });
+    }
+
+    return new Mesh(vertices);
+}
+
+void Mesh::SetTexture(GLuint tex)
+{
+    m_texture = tex;
+}
+
+GLuint Mesh::GetTexture() const
+{
+    return m_texture;
 }

@@ -77,6 +77,8 @@ int Application::Run() {
 
     m_lastTime = glfwGetTime();
 
+    static bool lPressed = false;
+
     while (!glfwWindowShouldClose(m_window)) {
 
         double frameStart = glfwGetTime();
@@ -97,6 +99,16 @@ int Application::Run() {
             m_renderer->EnableFaceCulling(true);
         if (glfwGetKey(m_window, GLFW_KEY_4) == GLFW_PRESS)
             m_renderer->EnableFaceCulling(false);
+
+        if (glfwGetKey(m_window, GLFW_KEY_L) == GLFW_PRESS && !lPressed)
+        {
+            m_renderer->ToggleLight();
+            lPressed = true;
+        }
+        if (glfwGetKey(m_window, GLFW_KEY_L) == GLFW_RELEASE)
+        {
+            lPressed = false;
+        }
 
         glm::mat4 view;
         if (m_gameplay->GetState() == STATE_COOKING || m_gameplay->GetState() == STATE_ASSEMBLING) {

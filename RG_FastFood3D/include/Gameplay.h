@@ -42,6 +42,7 @@ private:
     GLuint m_texSignature = 0;
     GLuint m_texGreen = 0;
     GLuint m_texGray = 0;
+    GLuint m_texPlate = 0;
 
     // gameplay variables
     float m_btnPosX = 0.0f;
@@ -87,6 +88,7 @@ private:
     std::unique_ptr<Mesh> m_pattieMesh;
     std::unique_ptr<Mesh> m_ovenMesh;
     std::unique_ptr<Mesh> m_tableMesh;
+    std::unique_ptr<Mesh> m_plateMesh;
 
     glm::vec3 m_ovenMin;
     glm::vec3 m_ovenMax;

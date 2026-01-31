@@ -2,6 +2,7 @@
 #include "../include/Texture.h"
 #include "../include/Input.h"
 #include <iostream>
+#include "../include/ModelLoader.h"
 
 AssemblingController::AssemblingController() {}
 
@@ -18,13 +19,30 @@ void AssemblingController::LoadTextures() {
     m_texBunTop = Texture::FromFile("res/top_bun.png");
     m_texKetchupSpill = Texture::FromFile("res/ketchup_spill.png");
     m_texMustardSpill = Texture::FromFile("res/mustard_spill.png");
+
+    m_meshSpill = Mesh::CreateSpillQuad();
 }
 
-void AssemblingController::SpawnSpill(GLuint texID, float x, float y, float scale) {
+void AssemblingController::LoadModels(Mesh* pattie) {
+    m_meshBunBottom = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/buns/bun_bottom.obj"));
+    m_meshPattie = pattie;
+    m_meshKetchup = std::unique_ptr<Mesh>(Mesh::CreateSauceBottle());
+    m_meshKetchup->SetTexture(m_texKetchup);
+    m_meshMustard = std::unique_ptr<Mesh>(Mesh::CreateSauceBottle());
+    m_meshMustard->SetTexture(m_texMustard);
+    m_meshPickles = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/pickles/krastavac.obj"));
+    m_meshOnion = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/onion/luk.obj"));
+    m_meshLettuce = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/lettuce/salata.obj"));
+    m_meshCheese = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/cheese/sir.obj"));
+    m_meshTomato = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/tomato/paradajz.obj"));
+    m_meshBunTop = std::unique_ptr<Mesh>(ModelLoader::LoadOBJ("models/buns/bun_top.obj"));
+}
+
+void AssemblingController::SpawnSpill(GLuint texID, float x, float z, float scale)
+{
     Spill s;
     s.tex = texID;
-    s.x = x;
-    s.y = y;
+    s.pos = glm::vec3(x, -0.49f, z);
     s.scale = scale;
     m_spills.push_back(s);
 }
@@ -32,16 +50,16 @@ void AssemblingController::SpawnSpill(GLuint texID, float x, float y, float scal
 void AssemblingController::Start(GLuint cookedPattieTexture) {
     m_list.clear();
 
-    m_list.emplace_back(ING_BUN_BOTTOM, m_texBunBottom);
-    m_list.emplace_back(ING_PATTIE, cookedPattieTexture);
-    m_list.emplace_back(ING_KETCHUP, m_texKetchup);
-    m_list.emplace_back(ING_MUSTARD, m_texMustard);
-    m_list.emplace_back(ING_PICKLES, m_texPickles);
-    m_list.emplace_back(ING_ONION, m_texOnion);
-    m_list.emplace_back(ING_LETTUCE, m_texLettuce);
-    m_list.emplace_back(ING_CHEESE, m_texCheese);
-    m_list.emplace_back(ING_TOMATO, m_texTomato);
-    m_list.emplace_back(ING_BUN_TOP, m_texBunTop);
+    m_list.emplace_back(ING_BUN_BOTTOM, m_meshBunBottom.get(), m_meshBunBottom->GetTexture());
+    m_list.emplace_back(ING_PATTIE, m_meshPattie, cookedPattieTexture);
+    m_list.emplace_back(ING_KETCHUP, m_meshKetchup.get(), m_meshKetchup->GetTexture());
+    m_list.emplace_back(ING_MUSTARD, m_meshMustard.get(), m_meshMustard->GetTexture());
+    m_list.emplace_back(ING_PICKLES, m_meshPickles.get(), m_meshPickles->GetTexture());
+    m_list.emplace_back(ING_ONION, m_meshOnion.get(), m_meshOnion->GetTexture());
+    m_list.emplace_back(ING_LETTUCE, m_meshLettuce.get(), m_meshLettuce->GetTexture());
+    m_list.emplace_back(ING_CHEESE, m_meshCheese.get(), m_meshCheese->GetTexture());
+    m_list.emplace_back(ING_TOMATO, m_meshTomato.get(), m_meshTomato->GetTexture());
+    m_list.emplace_back(ING_BUN_TOP, m_meshBunTop.get(), m_meshBunTop->GetTexture());
 
     m_currentIndex = 0;
     m_done = false;
@@ -51,11 +69,7 @@ void AssemblingController::Start(GLuint cookedPattieTexture) {
     float plateY = -0.35f;
     float plateScale = 0.7f;
 
-    GLuint texPlate = Texture::FromFile("res/plate.png");
-    m_plate.Init(texPlate, plateX, plateY, plateScale);
-
-    m_stackOffsetY = plateY + 0.02f;
-    m_plateInitialized = true;
+    m_stackOffsetY = plateY + 0.2f;
 
     for (auto& ing : m_list)
         ing.Hide();
@@ -64,34 +78,54 @@ void AssemblingController::Start(GLuint cookedPattieTexture) {
         m_list[0].Show();
 }
 
-bool AssemblingController::IngredientOverPlate(float x, float y) {
-    return (x > -0.3f && x < 0.3f &&
-        y > -0.35f && y < 0.15f);
+bool AssemblingController::IngredientOverPlate(const Ingredient& ing) const
+{
+    glm::vec3 platePos(0.0f, -0.25f, 0.0f);
+
+    glm::vec3 p = ing.GetPosition();
+
+    float dx = p.x - platePos.x;
+    float dz = p.z - platePos.z;
+
+    float distSq = dx * dx + dz * dz;
+
+    float plateRadius = 0.35f;
+
+    return distSq <= plateRadius * plateRadius;
 }
 
 void AssemblingController::Update(float dt) {
     if (m_done) return;
 
     Ingredient& cur = m_list[m_currentIndex];
-    cur.Update(dt);
+    if (!cur.IsPlaced())
+        cur.Update(dt);
 
     bool isSauce = (cur.GetType() == ING_KETCHUP || cur.GetType() == ING_MUSTARD);
 
-    if (Input::KeyPressed(GLFW_KEY_SPACE)) {
+    if (Input::KeyPressed(GLFW_KEY_ENTER)) {
 
         //  SAUCE LOGIC
         if (isSauce)
         {
-            float tipX = cur.GetTipX();
-            float tipY = cur.GetTipY();
+            glm::vec3 tip = cur.GetTipWorldPosition();
 
             GLuint spillTex = (cur.GetType() == ING_KETCHUP)
                 ? m_texKetchupSpill
                 : m_texMustardSpill;
 
-            if (TipOverPlate(tipX, tipY))
+            // Plate check
+            glm::vec3 platePos(0.0f, -0.25f, 0.0f);
+
+            float dx = tip.x - platePos.x;
+            float dz = tip.z - platePos.z;
+
+            float distSq = dx * dx + dz * dz;
+            float plateRadius = 0.35f;
+
+            if (distSq <= plateRadius * plateRadius)
             {
-                SpawnSpill(spillTex, 0.0f, m_stackOffsetY, 0.22f);
+                SpawnSpill(spillTex, 0.0f, 4.0f, 0.22f);
 
                 cur.Hide();
                 cur.MarkPlaced();
@@ -105,18 +139,10 @@ void AssemblingController::Update(float dt) {
                 return;
             }
 
-            if (TipOverTable(tipX, tipY))
+            // Table check
+            if (tip.y < -0.35f)
             {
-                SpawnSpill(spillTex, tipX, tipY, 0.18f);
-
-                /*cur.Hide();
-                cur.MarkPlaced();
-                m_currentIndex++;*/
-
-                if (m_currentIndex < (int)m_list.size())
-                    m_list[m_currentIndex].Show();
-                else
-                    m_done = true;
+                SpawnSpill(spillTex, tip.x, tip.z + 4.0f, 0.18f);
 
                 return;
             }
@@ -125,55 +151,63 @@ void AssemblingController::Update(float dt) {
         }
 
         //  STANDARD INGREDIENT
-        if (IngredientOverPlate(cur.GetX(), cur.GetY()))
+        if (!IngredientOverPlate(cur))
+            return;
+
+        cur.ForcePosition(0.0f, 0.0f);
+        cur.SetY(m_stackOffsetY);
+        cur.MarkPlaced();
+        m_stackOffsetY += 0.07f;
+        m_currentIndex++;
+
+        if (m_currentIndex < (int)m_list.size())
         {
-            cur.ForcePosition(0.0f, m_stackOffsetY);
-            cur.MarkPlaced();
-            m_stackOffsetY += 0.07f;
-
-            cur.Hide();
-            m_currentIndex++;
-
-            if (m_currentIndex < (int)m_list.size())
-                m_list[m_currentIndex].Show();
-            else
-                m_done = true;
+            m_list[m_currentIndex].Show();
+        }
+        else
+        {
+            m_done = true;
         }
     }
 }
 
-void AssemblingController::Render(GLuint shaderProgram, GLuint vao) {
-    if (m_plateInitialized)
-        m_plate.Render(shaderProgram, vao);
+void AssemblingController::Render(
+    const glm::mat4& view,
+    const glm::mat4& projection,
+    const glm::vec3& camPos,
+    bool finished) {
 
-    for (const Spill& s : m_spills) {
-        if (s.tex == 0) continue;
-        glBindTexture(GL_TEXTURE_2D, s.tex);
-        GLint locPos = glGetUniformLocation(shaderProgram, "uPos");
-        GLint locScale = glGetUniformLocation(shaderProgram, "uScale");
-        glUniform2f(locPos, s.x, s.y);
-        glUniform2f(locScale, s.scale, s.scale);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    }
+    for (const Spill& s : m_spills)
+        m_renderer->RenderSpill(m_meshSpill, view, projection, camPos, s);
 
-    for (int i = 0; i < (int)m_list.size(); i++) {
-        if (!m_list[i].IsVisible() && !m_list[i].IsPlaced())
+    float finishedScaleMul = finished ? 2.0f : 1.0f;
+
+    for (auto& ing : m_list)
+    {
+        if (!ing.IsVisible() && !ing.IsPlaced())
             continue;
 
-        if ((m_list[i].GetType() == ING_KETCHUP || m_list[i].GetType() == ING_MUSTARD) && m_list[i].IsPlaced())
+        if ((ing.GetType() == ING_KETCHUP || ing.GetType() == ING_MUSTARD) && ing.IsPlaced())
             continue;
 
-        m_list[i].Render(shaderProgram, vao);
+        glm::vec3 originalScale = ing.GetScale();
+
+        if (finished)
+            ing.SetScale(originalScale * finishedScaleMul);
+
+        ing.Render(m_renderer, view, projection, camPos);
+
+        if (finished)
+            ing.SetScale(originalScale);
     }
 }
 
-bool AssemblingController::TipOverPlate(float tipX, float tipY)
+float AssemblingController::ConvertScreenToX(float screenX)
 {
-    return (tipX > -0.25f && tipX < 0.25f &&
-        tipY > -0.35f && tipY < -0.10f);
+    return screenX * 0.3f;
 }
 
-bool AssemblingController::TipOverTable(float tipX, float tipY)
+float AssemblingController::ConvertScreenToZ(float screenY)
 {
-    return (tipY > -0.9f && tipY < -0.35f);
+    return screenY * 0.5f;
 }
